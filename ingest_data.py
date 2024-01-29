@@ -1,64 +1,71 @@
-import os
 import argparse
-
+import sys
 from time import time
 
 import pandas as pd
+import requests
 from sqlalchemy import create_engine
 
 
-def main(params):
-    user = params.user
-    password = params.password
-    host = params.host 
-    port = params.port 
-    db = params.db
-    table_name = params.table_name
-    datetime_columns = params.datetime_columns
-    url = params.url
-    
-    if url.endswith('.csv.gz'):
-        csv_name = 'output.csv.gz'
-    else:
-        csv_name = 'output.csv'
+def download_file(url, destination):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        with open(destination, 'wb') as file:
+            file.write(response.content)
+    except requests.RequestException as e:
+        print(f"Error downloading file: {e}")
+        sys.exit(1)
 
-    os.system(f"wget {url} -O {csv_name}")
 
-    engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
+def convert_to_datetime(df, datetime_columns):
+    if datetime_columns is not None:
+        df[datetime_columns] = df[datetime_columns].apply(pd.to_datetime)
+    return df
+
+
+def ingest_data_to_postgres(csv_name, params):
+    engine = create_engine(f'postgresql://{params.user}:{params.password}@{params.host}:{params.port}/{params.db}')
 
     df_iter = pd.read_csv(csv_name, iterator=True, chunksize=100000)
 
     df = next(df_iter)
+    df = convert_to_datetime(df, params.datetime_columns)
 
-    if datetime_columns is not None:
-        for column in datetime_columns:
-            df[column] = pd.to_datetime(df[column])
+    df.head(n=0).to_sql(name=params.table_name, con=engine, if_exists='replace')
 
-    df.head(n=0).to_sql(name=table_name, con=engine, if_exists='replace')
+    df.to_sql(name=params.table_name, con=engine, if_exists='append')
 
-    df.to_sql(name=table_name, con=engine, if_exists='append')
-
-
-    while True: 
-
+    while True:
         try:
             t_start = time()
-            
+
             df = next(df_iter)
+            df = convert_to_datetime(df, params.datetime_columns)
 
-            if datetime_columns is not None:
-                for column in datetime_columns:
-                    df[column] = pd.to_datetime(df[column])
-
-            df.to_sql(name=table_name, con=engine, if_exists='append')
+            df.to_sql(name=params.table_name, con=engine, if_exists='append')
 
             t_end = time()
 
-            print('inserted another chunk, took %.3f second' % (t_end - t_start))
+            print(f"Inserted chunk in {t_end - t_start:.3f} seconds")
 
         except StopIteration:
-            print("Finished ingesting data into the postgres database")
+            print("Finished ingesting data")
             break
+        except pd.errors.EmptyDataError:
+            print("No more data available")
+            break
+
+
+def main(params):
+    if params.url.endswith('.csv.gz'):
+        csv_name = 'output.csv.gz'
+    else:
+        csv_name = 'output.csv'
+
+    download_file(params.url, csv_name)
+    ingest_data_to_postgres(csv_name, params)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Ingest CSV data to Postgres')
@@ -73,5 +80,9 @@ if __name__ == '__main__':
     parser.add_argument('--datetime_columns', required=False, help='columns that need to be converted to datetime')
 
     args = parser.parse_args()
+
+    datetime_columns = args.datetime_columns.split(',') if args.datetime_columns else None
+
+    args.datetime_columns = datetime_columns
 
     main(args)

@@ -1,5 +1,5 @@
-SELECT DATE(lpep_pickup_datetime),MAX(trip_distance)
+SELECT DATE(lpep_pickup_datetime) AS pickup_date, MAX(trip_distance) AS max_trip_distance
 FROM green_taxi_trips
-GROUP BY DATE(lpep_pickup_datetime)
-ORDER BY MAX(trip_distance) DESC
+GROUP BY pickup_date
+ORDER BY max_trip_distance DESC
 LIMIT 1
