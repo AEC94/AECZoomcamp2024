@@ -33,7 +33,6 @@ if docker run -it \
   echo "Ingestion of green taxi data successful"
 else
   echo "Error in green taxi data ingestion"
-  exit 1
 fi
 ```
 
@@ -50,10 +49,9 @@ if docker run -it \
     --port=5432 \
     --db=ny_taxi \
     --table_name=taxi_zones \
-    --url=${URL}
+    --url=${URL}; then
   echo "Ingestion of taxi zones successful"
 else
   echo "Error in taxi zones ingestion"
-  exit 1
 fi
 ```

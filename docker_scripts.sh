@@ -13,7 +13,6 @@ if docker run -it \
   echo "Ingestion of green taxi data successful"
 else
   echo "Error in green taxi data ingestion"
-  exit 1
 fi
 
 URL="https://s3.amazonaws.com/nyc-tlc/misc/taxi+_zone_lookup.csv"
@@ -31,5 +30,4 @@ if docker run -it \
   echo "Ingestion of taxi zones successful"
 else
   echo "Error in taxi zones ingestion"
-  exit 1
 fi
