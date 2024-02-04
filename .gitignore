@@ -1,8 +1,0 @@
-#Postgres data
-ny_taxi_postgres_data/
-
-#Keys Service Account
-terraform/keys/*.json
-
-#Provider info
-/terraform/.terraform/*
