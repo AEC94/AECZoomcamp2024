@@ -6,3 +6,7 @@ terraform/keys/*.json
 
 #Provider info
 /terraform/.terraform/*
+
+/data
+/google-cloud-sdk
+*.json
