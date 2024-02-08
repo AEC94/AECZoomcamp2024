@@ -1,18 +1,14 @@
-# New York Taxi Data Ingestion Project
-
-This project facilitates the ingestion of New York taxi data into a PostgreSQL database using a Docker container. The data is sourced from public datasets provided by the city of New York.
-
 ## Requirements
 
-- [Docker](https://www.docker.com/)
-- [Python](https://www.python.org/) (for ingestion scripts)
+- google-cloud-storage
+- gcloud
 
 ## Usage Instructions
 
-### Step 1: Build Docker Image
+### Step 1: Upload data to GCS
 
 ```bash
-docker build -t taxi_ingest:v001 .
+python web_to_gcs.py
 ```
 ### Step 2: Run queries
 
