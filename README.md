@@ -49,17 +49,11 @@ data = [people_1,people_2]
 pipeline = dlt.pipeline(destination='duckdb', dataset_name='people')
 
 
-info = pipeline.run(data[0],
-										table_name="people",
-										write_disposition="replace",
-                    primary_key="record_hash")
+info = pipeline.run(data[0],table_name="people",write_disposition="replace",primary_key="record_hash")
 
 print(info)
 
-info = pipeline.run(data[1],
-										table_name="people",
-										write_disposition="append",
-                    primary_key="record_hash")
+info = pipeline.run(data[1],table_name="people",write_disposition="append",primary_key="record_hash")
 
 print(info)
 
@@ -86,17 +80,11 @@ display(conn.sql("show tables"))
 
 
 
-info = pipeline2.run(data[0],
-										table_name="people_merged",
-										write_disposition="replace",
-                    primary_key="id")
+info = pipeline2.run(data[0],table_name="people_merged",write_disposition="replace",primary_key="id")
 
 print(info)
 
-info = pipeline2.run(data[1],
-										table_name="people_merged",
-										write_disposition="merge",
-                    primary_key="id")
+info = pipeline2.run(data[1],table_name="people_merged",write_disposition="merge",primary_key="id")
 
 conn2 = duckdb.connect(f"{pipeline2.pipeline_name}.duckdb")
 conn2.sql(f"SET search_path = '{pipeline2.dataset_name}'")
