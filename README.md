@@ -1,76 +1,111 @@
 ## Requirements
 
-- google-cloud-storage
-- gcloud
+- dlt
+- duckdb
 
-## Usage Instructions
 
-### Step 1: Upload data to GCS
+## Data Talks Club Data Engineering Zoomcamp: Data Loading Workshop
+Welcome to the Data Talks Club Data Engineering Zoomcamp's Data Loading Workshop! In this workshop, we will be practicing data loading techniques using Python generators and DuckDB, focusing on best practices in data engineering.
 
-```bash
-python web_to_gcs.py
+### Exercise 1: Using a Generator
+
+```python
+def square_root_generator(limit):
+    n = 1
+    while n <= limit:
+        yield n ** 0.5
+        n += 1
+
+# Example usage:
+limit = 13
+generator = square_root_generator(limit)
+
+sum = 0
+for sqrt_value in generator:
+    sum = sqrt_value + sum
+    print(sqrt_value)
 ```
-### Step 2: Run queries
+### Exercise 2: Appending a Generator to a Table
 
 ### External table
-```sql
-CREATE OR REPLACE EXTERNAL TABLE `zoomcamp2024-412721.ny_taxi.external_green_tripdata`
-OPTIONS (
-  format = 'PARQUET',
-  uris = ['gs://homework-week3-aec/*']
-);
-```
+```python
+def people_1():
+    for i in range(1, 6):
+        yield {"ID": i, "Name": f"Person_{i}", "Age": 25 + i, "City": "City_A"}
 
-This query creates an external table named external_green_tripdata pointing to Parquet files stored in a Google Cloud Storage (GCS) bucket.
-
-### Materialized table
-```sql
-CREATE OR REPLACE TABLE `zoomcamp2024-412721.ny_taxi.green_tripdata` AS
-SELECT * FROM `zoomcamp2024-412721.ny_taxi.external_green_tripdata`;
-```
-
-This query creates a materialized table named green_tripdata by selecting all data from the external table external_green_tripdata.
-
-### Question 1:
-```sql
-SELECT COUNT(*) FROM `zoomcamp2024-412721.ny_taxi.external_green_tripdata`;
-```
-This query counts the total number of records in the external table external_green_tripdata.
-
-### Question 2:
-```sql
-SELECT COUNT(DISTINCT PULocationID) FROM `zoomcamp2024-412721.ny_taxi.external_green_tripdata`; --0B
-
-SELECT COUNT(DISTINCT PULocationID) FROM `zoomcamp2024-412721.ny_taxi.green_tripdata`; --6.41MB
+def people_2():
+    for i in range(3, 9):
+        yield {"ID": i, "Name": f"Person_{i}", "Age": 30 + i, "City": "City_B", "Occupation": f"Job_{i}"}
 
 ```
-The first query counts the distinct number of PULocationIDs in the external table external_green_tripdata, and the second query counts the same in the materialized table green_tripdata.
 
-### Question 3:
-```sql
-SELECT COUNT(*)
-FROM `zoomcamp2024-412721.ny_taxi.green_tripdata`
-WHERE fare_amount = 0;
+### Exercise 3: Merging a Generator
+```python
+import dlt
+import duckdb
+
+data = [people_1,people_2]
+
+pipeline = dlt.pipeline(destination='duckdb', dataset_name='people')
+
+
+info = pipeline.run(data[0],
+										table_name="people",
+										write_disposition="replace",
+                    primary_key="record_hash")
+
+print(info)
+
+info = pipeline.run(data[1],
+										table_name="people",
+										write_disposition="append",
+                    primary_key="record_hash")
+
+print(info)
+
+conn = duckdb.connect(f"{pipeline.pipeline_name}.duckdb")
+
+conn.sql(f"SET search_path = '{pipeline.dataset_name}'")
+print('Loaded tables: ')
+display(conn.sql("show tables"))
+
+
+print("\n\n\n People:")
+people_1 = conn.sql("SELECT * FROM people").df()
+display(people_1)
+
+print("\n\n\n Age Syn")
+age = conn.sql("SELECT SUM(age) FROM people").df()
+display(age)
+
+
+pipeline2 = dlt.pipeline(destination='duckdb', dataset_name='people')
+
+print('Loaded tables: ')
+display(conn.sql("show tables"))
+
+
+
+info = pipeline2.run(data[0],
+										table_name="people_merged",
+										write_disposition="replace",
+                    primary_key="id")
+
+print(info)
+
+info = pipeline2.run(data[1],
+										table_name="people_merged",
+										write_disposition="merge",
+                    primary_key="id")
+
+conn2 = duckdb.connect(f"{pipeline2.pipeline_name}.duckdb")
+conn2.sql(f"SET search_path = '{pipeline2.dataset_name}'")
+
+print("\n\n\n People Merged:")
+people_1 = conn.sql("SELECT * FROM people_merged").df()
+display(people_1)
+
+print("\n\n\n Age Syn")
+age = conn.sql("SELECT SUM(age) FROM people_merged").df()
+display(age)
 ```
-This query counts the number of records in the materialized table green_tripdata where the fare amount is 0.
-
-### Question 4:
-```sql
-CREATE OR REPLACE TABLE `zoomcamp2024-412721.ny_taxi.green_tripdata_optimized`
-PARTITION BY DATE(lpep_pickup_datetime)
-CLUSTER BY PUlocationID AS
-SELECT * FROM `zoomcamp2024-412721.ny_taxi.external_green_tripdata`;
-```
-This query creates a partitioned and clustered table named green_tripdata_optimized by selecting all data from the external table external_green_tripdata.
-
-### Question 5:
-```sql
-SELECT DISTINCT PUlocationID
-FROM `zoomcamp2024-412721.ny_taxi.green_tripdata`
-WHERE lpep_pickup_datetime BETWEEN '2022-06-01' AND '2022-06-30';
-
-SELECT DISTINCT PUlocationID
-FROM `zoomcamp2024-412721.ny_taxi.green_tripdata_optimized`
-WHERE lpep_pickup_datetime BETWEEN '2022-06-01' AND '2022-06-30';
-```
-The first query selects distinct PULocationIDs within a specific date range from the materialized table green_tripdata, and the second query does the same from the partitioned and clustered table green_tripdata_optimized.
