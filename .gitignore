@@ -1,12 +1,5 @@
-#Postgres data
-ny_taxi_postgres_data/
-
-#Keys Service Account
-terraform/keys/*.json
-
-#Provider info
-/terraform/.terraform/*
-
-/data
-/google-cloud-sdk
-*.json
+# you shouldn't commit these into source control
+# these are the default directory names, adjust/add to fit your needs
+taxi_rides_ny/target/
+taxi_rides_ny/dbt_packages/
+taxi_rides_ny/logs/
