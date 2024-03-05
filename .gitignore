@@ -1,5 +1,6 @@
 # you shouldn't commit these into source control
 # these are the default directory names, adjust/add to fit your needs
-taxi_rides_ny/target/
-taxi_rides_ny/dbt_packages/
-taxi_rides_ny/logs/
+*.csv
+spark-3.3.2-bin-hadoop3
+jdk-11.0.2
+google-cloud-sdk
