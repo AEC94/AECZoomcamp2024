@@ -1,76 +1,77 @@
-## Requirements
+# Data Engineering Notebook Readme
 
-- google-cloud-storage
-- gcloud
+## Overview
+This Jupyter Notebook showcases various data engineering tasks using PySpark, a powerful analytics engine for large-scale data processing. It includes data loading, processing, and analysis tasks using NYC taxi trip data.
 
-## Usage Instructions
-
-### Step 1: Upload data to GCS
+## Setup
+To run this notebook, make sure you have the required dependencies installed. The notebook uses PySpark version 3.3.2, Findspark, and Pyngrok. You can install these dependencies using pip:
 
 ```bash
-python web_to_gcs.py
-```
-### Step 2: Run queries
-
-### External table
-```sql
-CREATE OR REPLACE EXTERNAL TABLE `zoomcamp2024-412721.ny_taxi.external_green_tripdata`
-OPTIONS (
-  format = 'PARQUET',
-  uris = ['gs://homework-week3-aec/*']
-);
+!pip install pyspark==3.3.2
+!pip install findspark
+!pip install pyngrok
 ```
 
-This query creates an external table named external_green_tripdata pointing to Parquet files stored in a Google Cloud Storage (GCS) bucket.
+## Configuration
+After installing the dependencies, configure the environment. The notebook sets up an Ngrok tunnel to expose the Spark UI to view execution details:
 
-### Materialized table
-```sql
-CREATE OR REPLACE TABLE `zoomcamp2024-412721.ny_taxi.green_tripdata` AS
-SELECT * FROM `zoomcamp2024-412721.ny_taxi.external_green_tripdata`;
+```python
+from pyngrok import ngrok, conf
+import getpass
+
+conf.get_default().auth_token = getpass.getpass()
+
+ui_port = 4040
+public_url = ngrok.connect(ui_port).public_url
+print(f" * ngrok tunnel \"{public_url}\" -> \"http://127.0.0.1:{ui_port}\"")
 ```
 
-This query creates a materialized table named green_tripdata by selecting all data from the external table external_green_tripdata.
+## Data Loading
+The notebook loads NYC FHV trip data for October 2019 and taxi zone lookup data. It defines schemas for both datasets and loads them into Spark DataFrames:
 
-### Question 1:
-```sql
-SELECT COUNT(*) FROM `zoomcamp2024-412721.ny_taxi.external_green_tripdata`;
+```python
+# Loading FHV trip data
+schema_fhv = ...
+df_fhv = spark.read \
+    .option("header", "true") \
+    .schema(schema_fhv) \
+    .csv('/content/fhv_tripdata_2019-10.csv')
+df_fhv.write.parquet('fhv/2019/10/')
+df_fhv.registerTempTable('fhv_tripdata')
+
+# Loading taxi zone data
+zones_schema = ...
+df_zones = spark.read \
+    .option("header", "true") \
+    .schema(zones_schema) \
+    .csv('/content/taxi_zone_lookup.csv')
+df_zones.registerTempTable('zones_data')
 ```
-This query counts the total number of records in the external table external_green_tripdata.
 
-### Question 2:
-```sql
-SELECT COUNT(DISTINCT PULocationID) FROM `zoomcamp2024-412721.ny_taxi.external_green_tripdata`; --0B
+Data Analysis
+The notebook performs various data analysis tasks on the loaded datasets. It calculates the number of trips and maximum trip duration, and performs SQL queries to analyze trip distribution by zone:
 
-SELECT COUNT(DISTINCT PULocationID) FROM `zoomcamp2024-412721.ny_taxi.green_tripdata`; --6.41MB
+```python
+# Count trips on a specific date
+df_fhv.where(F.to_date('pickup_datetime')=='2019-10-15').count()
 
+# Calculate maximum trip duration
+df_fhv.withColumn('diff_hours',(F.col("dropoff_datetime").cast("long") - F.col('pickup_datetime').cast("long"))/F.lit(3600)).agg(F.max('diff_hours')).show()
+
+# Analyze trip distribution by zone
+spark.sql("""
+SELECT
+    Zone,
+    count(*) AS trips
+FROM
+    fhv_tripdata
+LEFT JOIN
+    zones_data ON PULocationID = LocationID
+GROUP BY 
+    Zone
+ORDER BY trips
+""").show()
 ```
-The first query counts the distinct number of PULocationIDs in the external table external_green_tripdata, and the second query counts the same in the materialized table green_tripdata.
 
-### Question 3:
-```sql
-SELECT COUNT(*)
-FROM `zoomcamp2024-412721.ny_taxi.green_tripdata`
-WHERE fare_amount = 0;
-```
-This query counts the number of records in the materialized table green_tripdata where the fare amount is 0.
-
-### Question 4:
-```sql
-CREATE OR REPLACE TABLE `zoomcamp2024-412721.ny_taxi.green_tripdata_optimized`
-PARTITION BY DATE(lpep_pickup_datetime)
-CLUSTER BY PUlocationID AS
-SELECT * FROM `zoomcamp2024-412721.ny_taxi.external_green_tripdata`;
-```
-This query creates a partitioned and clustered table named green_tripdata_optimized by selecting all data from the external table external_green_tripdata.
-
-### Question 5:
-```sql
-SELECT DISTINCT PUlocationID
-FROM `zoomcamp2024-412721.ny_taxi.green_tripdata`
-WHERE lpep_pickup_datetime BETWEEN '2022-06-01' AND '2022-06-30';
-
-SELECT DISTINCT PUlocationID
-FROM `zoomcamp2024-412721.ny_taxi.green_tripdata_optimized`
-WHERE lpep_pickup_datetime BETWEEN '2022-06-01' AND '2022-06-30';
-```
-The first query selects distinct PULocationIDs within a specific date range from the materialized table green_tripdata, and the second query does the same from the partitioned and clustered table green_tripdata_optimized.
+## Conclusion
+This notebook demonstrates key data engineering tasks such as data loading, processing, and analysis using PySpark. It serves as a comprehensive guide for handling large-scale datasets and deriving valuable insights.
